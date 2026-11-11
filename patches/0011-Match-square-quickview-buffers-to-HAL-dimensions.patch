@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CN MrLin <cnmrlin@users.noreply.github.com>
+Date: Sat, 3 Oct 2026 02:00:00 +0800
+Subject: [PATCH] Match square quickview buffers to HAL dimensions
+
+The rear HAL copies a 1280x960 image into the early YUV buffer. Reading it as
+1080x1080 produces striped thumbnails. Request 1280x960 and use the existing
+1:1 crop in the app.
+
+---
+diff --git a/smali/e8/e0.smali b/smali/e8/e0.smali
+--- a/smali/e8/e0.smali
++++ b/smali/e8/e0.smali
+@@ -15907,6 +15907,25 @@
+ 
+     move-result v0
+ 
++    iget-object v7, v2, Le8/e0$a;->a:Le8/e0;
++
++    iget v7, v7, Le8/a;->a:I
++
++    const/4 v8, 0x1
++
++    if-ne v7, v8, :early_size_ready
++
++    const/16 v8, 0x438
++
++    if-ne v1, v8, :early_size_ready
++
++    if-ne v0, v8, :early_size_ready
++
++    const/16 v1, 0x500
++
++    const/16 v0, 0x3c0
++
++    :early_size_ready
+     iget p0, p0, Le8/P;->Y:I
+ 
+     const/16 v6, 0x23
+
+-- 
+2.43.0

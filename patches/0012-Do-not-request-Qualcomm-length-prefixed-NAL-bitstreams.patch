@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NullCode1337 <contact.nullcode@proton.me>
+Date: Sat, 24 Oct 2026 00:00:00 +0800
+Subject: [PATCH] Do not request Qualcomm length-prefixed NAL bitstreams
+
+MiuiCamera asks the Qualcomm HEVC encoder for length-prefixed NAL units
+("feature-nal-length-bitstream" + "nal-length-in-bytes" = 4) whenever the
+recording resolution is 4K or 8K. The encoder then also returns the codec
+specific data (csd-0) in that length-prefixed form, which MediaMuxer cannot
+consume: Utils.cpp's reassembleHVCC() requires csd-0 to start with an
+Annex-B start code and otherwise returns 0, so the muxer track ends up
+without hvcC.
+
+MPEG4Writer silently accepts the track, but at stop() its
+checkCodecSpecificData() fails, isTrackMalFormed() returns true and the
+whole video stbl (stsd/stts/ctts/stss/stsz/stsc/co64) is dropped. What is
+left behind is an audio-only MP4 with the video samples orphaned in mdat,
+which is why 4K/8K recordings show up corrupted and are never inserted into
+MediaStore, leaving the preview tab/gallery empty. 1080p does not set these
+keys and muxes fine.
+
+Skip the vendor keys so 4K/8K recordings take the same Annex-B path as
+1080p.
+
+---
+ smali_classes3/fh/e.smali | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/smali_classes3/fh/e.smali b/smali_classes3/fh/e.smali
+index d02e6ba..45340f4 100644
+--- a/smali_classes3/fh/e.smali
++++ b/smali_classes3/fh/e.smali
+@@ -774,7 +774,7 @@
+
+     iget-object v3, v2, Lfh/a;->e:Lfh/r;
+
+-    iget-boolean v7, v3, Lfh/r;->y:Z
++    const/4 v7, 0x0
+
+     if-eqz v7, :cond_1c
+
+--
+2.43.0
+

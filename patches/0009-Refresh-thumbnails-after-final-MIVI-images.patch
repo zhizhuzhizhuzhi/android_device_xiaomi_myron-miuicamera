@@ -1,0 +1,211 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CN MrLin <cnmrlin@users.noreply.github.com>
+Date: Sat, 3 Oct 2026 02:00:00 +0800
+Subject: [PATCH] Refresh thumbnails after the final MIVI image is saved
+
+Replace the quick-view bitmap when the final JPEG updates the same media URI.
+Decode on the saver thread and check the displayed and pending URI again on
+the UI thread so an older capture cannot replace a newer thumbnail.
+
+---
+diff --git a/smali/com/android/camera/compat/FinalThumbnailUpdater.smali b/smali/com/android/camera/compat/FinalThumbnailUpdater.smali
+new file mode 100644
+--- /dev/null
++++ b/smali/com/android/camera/compat/FinalThumbnailUpdater.smali
+@@ -0,0 +1,175 @@
++.class public final Lcom/android/camera/compat/FinalThumbnailUpdater;
++.super Ljava/lang/Object;
++.source "SourceFile"
++
++
++.method private constructor <init>()V
++    .locals 0
++
++    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
++
++    return-void
++.end method
++
++.method private static matches(Lj6/b;Landroid/net/Uri;)Z
++    .locals 3
++
++    const/4 v0, 0x0
++
++    if-eqz p0, :done
++
++    iget-object v1, p0, Lj6/b;->a:Lcom/android/camera/a;
++
++    invoke-virtual {v1}, Lcom/android/camera/a;->jk()Lo1/h1;
++
++    move-result-object v1
++
++    iget-object v1, v1, Lo1/h1;->a:Lo1/f1;
++
++    if-eqz v1, :done
++
++    iget-object v1, v1, Lo1/f1;->a:Landroid/net/Uri;
++
++    invoke-virtual {p1, v1}, Landroid/net/Uri;->equals(Ljava/lang/Object;)Z
++
++    move-result v2
++
++    if-eqz v2, :done
++
++    iget-object v1, p0, Lj6/b;->c:Lo1/f1;
++
++    if-eqz v1, :matched
++
++    iget-object v1, v1, Lo1/f1;->a:Landroid/net/Uri;
++
++    invoke-virtual {p1, v1}, Landroid/net/Uri;->equals(Ljava/lang/Object;)Z
++
++    move-result v2
++
++    if-eqz v2, :done
++
++    :matched
++    const/4 v0, 0x1
++
++    :done
++    return v0
++.end method
++
++.method public static refresh(Lpf/s;[BLandroid/net/Uri;)V
++    .locals 9
++
++    if-eqz p2, :done
++
++    if-eqz p1, :done
++
++    iget-object v2, p0, Lpf/s;->k:Lpf/I;
++
++    iget-object v2, v2, Lpf/I;->l:Ljava/lang/Object;
++
++    instance-of v3, v2, Lp6/j;
++
++    if-eqz v3, :done
++
++    check-cast v2, Lp6/j;
++
++    iget-object v2, v2, Lp6/j;->a:Ljava/lang/ref/WeakReference;
++
++    if-eqz v2, :done
++
++    invoke-virtual {v2}, Ljava/lang/ref/Reference;->get()Ljava/lang/Object;
++
++    move-result-object v2
++
++    instance-of v3, v2, Lj6/b;
++
++    if-eqz v3, :done
++
++    check-cast v2, Lj6/b;
++
++    iget-object v0, p0, Lpf/s;->a:Lpf/H;
++
++    iget v3, v0, Lpf/H;->a:I
++
++    iget v5, v0, Lpf/H;->b:I
++
++    iget v0, v0, Lpf/H;->c:I
++
++    int-to-double v3, v3
++
++    int-to-double v7, v5
++
++    invoke-static {v3, v4, v7, v8}, Ljava/lang/Math;->max(DD)D
++
++    move-result-wide v3
++
++    const/16 v5, 0x200
++
++    int-to-double v5, v5
++
++    div-double/2addr v3, v5
++
++    invoke-static {v3, v4}, Ljava/lang/Math;->ceil(D)D
++
++    move-result-wide v3
++
++    double-to-int v3, v3
++
++    invoke-static {v3}, Ljava/lang/Integer;->highestOneBit(I)I
++
++    move-result v3
++
++    const/4 v4, 0x1
++
++    invoke-static {v3, v4}, Ljava/lang/Math;->max(II)I
++
++    move-result v3
++
++    const/4 v4, 0x0
++
++    invoke-static {p1, v0, v3, p2, v4}, Lo1/f1;->d([BIILandroid/net/Uri;Z)Lo1/f1;
++
++    move-result-object v3
++
++    if-eqz v3, :done
++
++    iget-object v4, v3, Lo1/f1;->b:Landroid/graphics/Bitmap;
++
++    if-eqz v4, :done
++
++    array-length v4, p1
++
++    int-to-long v4, v4
++
++    invoke-virtual {v3, v4, v5}, Lo1/f1;->p(J)V
++
++    iget-object v0, v2, Lj6/b;->d:Ljava/lang/Object;
++
++    monitor-enter v0
++
++    :try_start_0
++    invoke-static {v2, p2}, Lcom/android/camera/compat/FinalThumbnailUpdater;->matches(Lj6/b;Landroid/net/Uri;)Z
++
++    move-result v4
++
++    if-eqz v4, :skip
++
++    const/4 v4, 0x0
++
++    invoke-virtual {v2, v3, v4}, Lj6/b;->d(Lo1/f1;Z)V
++
++    :skip
++    monitor-exit v0
++    return-void
++
++    :catchall_0
++    move-exception p0
++
++    monitor-exit v0
++    :try_end_0
++    .catchall {:try_start_0 .. :try_end_0} :catchall_0
++
++    throw p0
++
++    :done
++    return-void
++.end method
+diff --git a/smali/w6/d.smali b/smali/w6/d.smali
+--- a/smali/w6/d.smali
++++ b/smali/w6/d.smali
+@@ -718,6 +718,14 @@
+     :cond_b
+     move-object v15, v4
+ 
++    iget-object v2, v12, Lkotlin/jvm/internal/A;->a:Ljava/lang/Object;
++
++    check-cast v2, [B
++
++    move-object/from16 v6, p1
++
++    invoke-static {v6, v2, v10}, Lcom/android/camera/compat/FinalThumbnailUpdater;->refresh(Lpf/s;[BLandroid/net/Uri;)V
++
+     if-eqz v34, :cond_a
+ 
+     const/16 v17, 0x2
+
+-- 
+2.43.0
